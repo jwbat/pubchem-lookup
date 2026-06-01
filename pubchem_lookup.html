@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PubChem Structure Lookup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f5f0;
+      color: #1a1a1a;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 3rem 1rem;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 500;
+      margin-bottom: 0.25rem;
+      color: #1a1a1a;
+    }
+
+    .subtitle {
+      font-size: 0.875rem;
+      color: #888;
+      margin-bottom: 2rem;
+    }
+
+    .search-row {
+      display: flex;
+      gap: 8px;
+      width: 100%;
+      max-width: 520px;
+      margin-bottom: 1rem;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      padding: 0.6rem 1rem;
+      font-size: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      outline: none;
+      background: #fff;
+      transition: border-color 0.15s;
+    }
+
+    input[type="text"]:focus { border-color: #555; }
+
+    button {
+      padding: 0.6rem 1.25rem;
+      font-size: 0.9rem;
+      background: #1a1a1a;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    button:hover { background: #333; }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 520px;
+      margin-bottom: 2rem;
+    }
+
+    .chip {
+      padding: 4px 12px;
+      font-size: 0.8rem;
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      cursor: pointer;
+      color: #555;
+      transition: border-color 0.15s, color 0.15s;
+    }
+
+    .chip:hover { border-color: #888; color: #1a1a1a; }
+
+    #result {
+      width: 100%;
+      max-width: 520px;
+      text-align: center;
+      min-height: 300px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #placeholder {
+      color: #aaa;
+      font-size: 0.9rem;
+    }
+
+    #status {
+      color: #888;
+      font-size: 0.9rem;
+    }
+
+    .error { color: #c0392b; font-size: 0.9rem; }
+
+    #compound-img {
+      max-width: 380px;
+      width: 100%;
+      background: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 12px;
+      padding: 1rem;
+    }
+
+    #compound-name {
+      font-size: 1.2rem;
+      font-weight: 500;
+      margin: 1rem 0 0.2rem;
+    }
+
+    #compound-meta {
+      font-size: 0.85rem;
+      color: #777;
+      margin-bottom: 0.6rem;
+    }
+
+    #pubchem-link {
+      font-size: 0.8rem;
+      color: #2980b9;
+      text-decoration: none;
+    }
+
+    #pubchem-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+
+  <h1>PubChem Structure Lookup</h1>
+  <p class="subtitle">Enter any compound name, IUPAC name, or abbreviation</p>
+
+  <div class="search-row">
+    <input type="text" id="compound-input" placeholder="e.g. caffeine, cholesterol, ATP…" />
+    <button onclick="lookup()">Look up</button>
+  </div>
+
+  <div class="chips">
+    <span class="chip" onclick="quickLook('caffeine')">caffeine</span>
+    <span class="chip" onclick="quickLook('cholesterol')">cholesterol</span>
+    <span class="chip" onclick="quickLook('aspirin')">aspirin</span>
+    <span class="chip" onclick="quickLook('dopamine')">dopamine</span>
+    <span class="chip" onclick="quickLook('serotonin')">serotonin</span>
+    <span class="chip" onclick="quickLook('glucose')">glucose</span>
+    <span class="chip" onclick="quickLook('ATP')">ATP</span>
+    <span class="chip" onclick="quickLook('resveratrol')">resveratrol</span>
+    <span class="chip" onclick="quickLook('melatonin')">melatonin</span>
+    <span class="chip" onclick="quickLook('glycine')">glycine</span>
+  </div>
+
+  <div id="result">
+    <span id="placeholder">Enter a compound name above</span>
+  </div>
+
+  <script>
+    async function lookup() {
+      const input = document.getElementById('compound-input');
+      const name = input.value.trim();
+      if (!name) return;
+
+      const result = document.getElementById('result');
+      result.innerHTML = '<span id="status">Fetching from PubChem…</span>';
+
+      try {
+        const cidRes = await fetch(
+          `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(name)}/cids/JSON`
+        );
+        if (!cidRes.ok) throw new Error('not found');
+        const cidData = await cidRes.json();
+        const cid = cidData.IdentifierList.CID[0];
+
+        const propRes = await fetch(
+          `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/IUPACName,MolecularFormula,MolecularWeight/JSON`
+        );
+        const propData = await propRes.json();
+        const props = propData.PropertyTable.Properties[0];
+
+        const imgUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/PNG?image_size=400x400`;
+        const pageUrl = `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`;
+
+        const displayName = name.charAt(0).toUpperCase() + name.slice(1);
+        const mw = parseFloat(props.MolecularWeight).toFixed(2);
+
+        result.innerHTML = `
+          <img id="compound-img" src="${imgUrl}" alt="2D structure of ${displayName}" />
+          <p id="compound-name">${displayName}</p>
+          <p id="compound-meta">${props.MolecularFormula} &nbsp;·&nbsp; MW: ${mw} g/mol</p>
+          <a id="pubchem-link" href="${pageUrl}" target="_blank">View full record on PubChem ↗</a>
+        `;
+      } catch (e) {
+        result.innerHTML = `<span class="error">Compound "${name}" not found. Try a different name or spelling.</span>`;
+      }
+    }
+
+    function quickLook(name) {
+      document.getElementById('compound-input').value = name;
+      lookup();
+    }
+
+    document.getElementById('compound-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') lookup();
+    });
+  </script>
+
+</body>
+</html>
