@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 const CHIPS = [
   'caffeine', 'cholesterol', 'aspirin', 'dopamine', 'serotonin',
@@ -12,6 +12,13 @@ export default function App() {
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const errorTimer = useRef(null)
+
+  function flashError(msg) {
+    setError(msg)
+    clearTimeout(errorTimer.current)
+    errorTimer.current = setTimeout(() => setError(''), 2000)
+  }
 
   async function fetchByCid(cid) {
     const res = await fetch(
@@ -33,10 +40,6 @@ export default function App() {
   async function lookup(searchTerm = query) {
     const term = searchTerm.trim()
     if (!term) return
-    if (compounds.length >= MAX) {
-      setError(`Maximum of ${MAX} compounds reached. Remove one to add another.`)
-      return
-    }
     setLoading(true)
     setError('')
     try {
@@ -55,7 +58,7 @@ export default function App() {
       }
 
       if (compounds.some(c => c.cid === cid)) {
-        setError('That compound is already in the list.')
+        flashError(`${term} is already in the list.`)
         return
       }
 
@@ -64,7 +67,10 @@ export default function App() {
         compound.name = term.charAt(0).toUpperCase() + term.slice(1)
       }
 
-      setCompounds(prev => [...prev, compound])
+      setCompounds(prev => {
+        const next = [compound, ...prev]
+        return next.length > MAX ? next.slice(0, MAX) : next
+      })
       setQuery('')
     } catch {
       setError(`"${term}" not found. Try a different name, spelling, or CID number.`)
@@ -83,8 +89,6 @@ export default function App() {
     lookup(name)
   }
 
-  const atMax = compounds.length >= MAX
-
   return (
     <div className="page">
       <h1>PubChem Structure Lookup</h1>
@@ -99,7 +103,7 @@ export default function App() {
           placeholder="e.g. caffeine, cholesterol, ATP, or a CID number…"
           disabled={loading}
         />
-        <button onClick={() => lookup()} disabled={loading || atMax}>
+        <button onClick={() => lookup()} disabled={loading}>
           {loading ? 'Loading…' : 'Add'}
         </button>
       </div>
